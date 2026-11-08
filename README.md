@@ -14,6 +14,7 @@ The data has no missing values or duplicate rows. The classes are imbalanced, so
 https://github.com/amoldeokate-07/gender-gap-classification-app
 
 ## Streamlit app link
+https://hbcpaatjxo8etp76dvclek.streamlit.app/
 
 ## Models used
 
