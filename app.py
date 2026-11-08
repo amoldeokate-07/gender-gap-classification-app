@@ -5,6 +5,7 @@ from pathlib import Path
 import joblib
 import pandas as pd
 import streamlit as st
+from sklearn.model_selection import train_test_split
 from sklearn.metrics import (
     accuracy_score,
     classification_report,
@@ -15,6 +16,7 @@ from sklearn.metrics import (
     recall_score,
     roc_auc_score,
 )
+from train_models import RANDOM_STATE, TARGET, TEST_SIZE, prepare_features
 
 
 ROOT = Path(__file__).resolve().parent
@@ -37,7 +39,7 @@ st.title("Wikipedia Editor Gender Classification")
 st.write("Evaluate one of the five saved classifiers on a labeled CSV. The app does not retrain models on uploaded data.")
 st.caption("Target classes: 0 = unknown, 1 = male, 2 = female. Metrics use macro averaging for class-sensitive scores.")
 
-uploaded = st.file_uploader("Upload labeled test data (CSV)", type=["csv"])
+uploaded = st.file_uploader("Upload data.csv or the prepared test_data.csv", type=["csv"])
 model_name = st.selectbox("Choose a classifier", list(MODEL_FILES))
 
 if uploaded is not None:
@@ -46,14 +48,29 @@ if uploaded is not None:
         bundle = load_bundle(MODEL_FILES[model_name])
         target = bundle["target"]
         expected = bundle["feature_columns"]
-        missing = [column for column in expected + [target] if column not in data.columns]
-        if missing:
-            st.error("CSV is missing required columns: " + ", ".join(missing))
-        elif data.empty:
+        if data.empty:
             st.error("The uploaded CSV has no rows.")
+        elif target not in data.columns:
+            st.error(f"The uploaded CSV must include the target column '{target}' so the app can calculate evaluation metrics.")
         else:
-            X = data[expected]
-            y = data[target].astype(int)
+            # Full data.csv contains raw timestamp columns and the two alternative
+            # gender labels. Recreate the same fixed stratified holdout used during
+            # training so the app evaluates only the reserved test rows.
+            if "firstDay" in data.columns or "lastDay" in data.columns:
+                y_all = data[target].astype(int)
+                X_all = prepare_features(data)
+                _, X, _, y = train_test_split(
+                    X_all, y_all, test_size=TEST_SIZE, random_state=RANDOM_STATE, stratify=y_all
+                )
+                st.info(f"Loaded the full dataset and selected its fixed stratified {TEST_SIZE:.0%} test split ({len(X)} rows).")
+            else:
+                missing = [column for column in expected if column not in data.columns]
+                if missing:
+                    st.error("CSV is missing required model input columns: " + ", ".join(missing))
+                    st.stop()
+                X = data[expected]
+                y = data[target].astype(int)
+
             if not set(y.unique()).issubset(set(bundle["labels"])):
                 st.error("The target column contains class values not represented by the saved model.")
             else:
@@ -78,10 +95,11 @@ if uploaded is not None:
                 report = classification_report(y, prediction, labels=labels, zero_division=0, output_dict=True)
                 st.dataframe(pd.DataFrame(report).transpose().round(4), use_container_width=True)
                 st.subheader("Predictions preview")
-                preview = data.copy()
+                preview = X.copy()
+                preview[target] = y.to_numpy()
                 preview["predicted_gender"] = prediction
                 st.dataframe(preview.head(20), use_container_width=True)
     except Exception as exc:
         st.error(f"Could not evaluate this CSV: {exc}")
 else:
-    st.info("Upload test_data.csv from the project folder to view model metrics.")
+    st.info("Upload data.csv to have the app select the same held-out split, or upload test_data.csv directly.")

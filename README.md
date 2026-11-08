@@ -2,7 +2,7 @@
 
 ## Problem statement
 
-Compare five classification algorithms on the Gender Gap in Spanish Wikipedia dataset and provide an interactive app for evaluating saved models on a labeled test CSV.
+Compare five classification algorithms on the Gender Gap in Spanish Wikipedia dataset and provide an interactive app for evaluating saved models on a labeled CSV. The app accepts the original `data.csv` and selects its fixed held-out split, or the prepared `test_data.csv` directly; it never retrains models on uploaded data.
 
 ## Dataset description
 
